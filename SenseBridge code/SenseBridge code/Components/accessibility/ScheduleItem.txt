@@ -1,0 +1,71 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+import { Check, Clock } from 'lucide-react';
+import { cn } from "@/lib/utils";
+
+export default function ScheduleItem({ 
+  time, 
+  activity, 
+  icon: Icon,
+  isCompleted = false,
+  isNext = false,
+  onToggle 
+}) {
+  const handleToggle = () => {
+    if (navigator.vibrate) {
+      navigator.vibrate(isCompleted ? [50] : [100, 50, 100]);
+    }
+    onToggle?.();
+  };
+
+  return (
+    <motion.button
+      whileTap={{ scale: 0.98 }}
+      onClick={handleToggle}
+      className={cn(
+        'w-full rounded-2xl border-4 p-5 flex items-center gap-5',
+        'transition-all duration-200',
+        'focus:outline-none focus:ring-4 focus:ring-cyan-400 focus:ring-offset-4 focus:ring-offset-black',
+        isCompleted 
+          ? 'bg-green-900/50 border-green-500 opacity-60' 
+          : isNext 
+            ? 'bg-yellow-400 border-yellow-200 text-black' 
+            : 'bg-gray-900 border-gray-600'
+      )}
+    >
+      <div className={cn(
+        'w-16 h-16 rounded-xl flex items-center justify-center flex-shrink-0',
+        isCompleted ? 'bg-green-500' : isNext ? 'bg-black' : 'bg-gray-700'
+      )}>
+        {isCompleted ? (
+          <Check className="w-10 h-10 text-white" strokeWidth={4} />
+        ) : Icon ? (
+          <Icon className={cn('w-10 h-10', isNext ? 'text-yellow-400' : 'text-white')} strokeWidth={2.5} />
+        ) : (
+          <Clock className={cn('w-10 h-10', isNext ? 'text-yellow-400' : 'text-white')} strokeWidth={2.5} />
+        )}
+      </div>
+      
+      <div className="flex-1 text-left">
+        <p className={cn(
+          'text-lg font-bold',
+          isCompleted ? 'text-green-400 line-through' : isNext ? 'text-black' : 'text-gray-400'
+        )}>
+          {time}
+        </p>
+        <p className={cn(
+          'text-2xl font-bold',
+          isCompleted ? 'text-green-300 line-through' : isNext ? 'text-black' : 'text-white'
+        )}>
+          {activity}
+        </p>
+      </div>
+      
+      {isNext && (
+        <div className="bg-black text-yellow-400 px-4 py-2 rounded-xl text-lg font-bold">
+          NOW
+        </div>
+      )}
+    </motion.button>
+  );
+}

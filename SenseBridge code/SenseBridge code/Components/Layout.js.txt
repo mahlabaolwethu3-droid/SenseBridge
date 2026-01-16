@@ -1,0 +1,61 @@
+import React from 'react';
+import NavigationBar from '@/components/accessibility/NavigationBar';
+
+export default function Layout({ children, currentPageName }) {
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <style>{`
+        :root {
+          --background: 0 0% 0%;
+          --foreground: 0 0% 100%;
+          --card: 0 0% 8%;
+          --card-foreground: 0 0% 100%;
+          --primary: 210 100% 50%;
+          --primary-foreground: 0 0% 100%;
+          --secondary: 45 100% 60%;
+          --secondary-foreground: 0 0% 0%;
+          --muted: 0 0% 20%;
+          --muted-foreground: 0 0% 80%;
+          --accent: 210 100% 50%;
+          --accent-foreground: 0 0% 100%;
+          --destructive: 0 0% 100%;
+          --destructive-foreground: 0 0% 0%;
+          --border: 0 0% 30%;
+          --input: 0 0% 15%;
+          --ring: 210 100% 50%;
+
+          --success: 142 76% 36%;
+          --warning: 38 92% 50%;
+          --info: 210 100% 50%;
+        }
+        
+        * {
+          -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          background: black;
+          color: white;
+        }
+        
+        ::selection {
+          background: #0080FF;
+          color: white;
+        }
+
+        /* High contrast borders and focus states */
+        *:focus-visible {
+          outline: 4px solid #0080FF !important;
+          outline-offset: 4px;
+        }
+      `}</style>
+      
+      <main className="pb-28">
+        {children}
+      </main>
+      
+      <NavigationBar currentPage={currentPageName} />
+    </div>
+  );
+}

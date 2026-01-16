@@ -1,0 +1,67 @@
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Wand2, Loader2 } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
+import { toast } from 'sonner';
+import AccessibleButton from './AccessibleButton';
+
+export default function TextSimplifier({ text, onSimplified }) {
+  const [isSimplifying, setIsSimplifying] = useState(false);
+  const [simplifiedText, setSimplifiedText] = useState('');
+
+  const simplifyText = async () => {
+    if (!text || !text.trim()) {
+      toast.error('No text to simplify');
+      return;
+    }
+
+    setIsSimplifying(true);
+    try {
+      const simplified = await base44.integrations.Core.InvokeLLM({
+        prompt: `Simplify the following text for someone with cognitive disabilities. Use very simple words, short sentences, and clear language. Keep the same meaning but make it much easier to understand:\n\n"${text}"`,
+      });
+      
+      setSimplifiedText(simplified.trim());
+      onSimplified?.(simplified.trim());
+      
+      if (navigator.vibrate) {
+        navigator.vibrate([50, 30, 50]);
+      }
+      
+      toast.success('Text simplified');
+    } catch (error) {
+      console.error('Error simplifying text:', error);
+      toast.error('Failed to simplify text');
+    } finally {
+      setIsSimplifying(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <AccessibleButton
+        variant="primary"
+        size="large"
+        icon={isSimplifying ? Loader2 : Wand2}
+        onClick={simplifyText}
+        disabled={isSimplifying}
+        className="w-full"
+      >
+        {isSimplifying ? 'Simplifying...' : 'Simplify Text'}
+      </AccessibleButton>
+
+      {simplifiedText && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white border-4 border-black rounded-2xl p-6"
+        >
+          <h3 className="text-xl font-black text-black mb-3">Simplified:</h3>
+          <p className="text-2xl text-black leading-relaxed font-bold">
+            {simplifiedText}
+          </p>
+        </motion.div>
+      )}
+    </div>
+  );
+}

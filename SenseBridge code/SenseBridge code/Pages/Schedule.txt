@@ -1,0 +1,396 @@
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { 
+  Calendar, Sun, Coffee, Utensils, Briefcase, 
+  Moon, Book, Dumbbell, Pill, Bath, Volume2, VolumeX, Plus, Edit2
+} from 'lucide-react';
+import ScheduleItem from '@/components/accessibility/ScheduleItem';
+import BrailleDisplay from '@/components/accessibility/BrailleDisplay';
+import AccessibleButton from '@/components/accessibility/AccessibleButton';
+import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
+
+// Icon mapping
+const iconMap = {
+  Sun, Coffee, Pill, Dumbbell, Utensils, Briefcase, Book, Bath, Moon
+};
+
+const defaultSchedule = [
+  { time: '7:00 AM', activity: 'Wake up', iconName: 'Sun' },
+  { time: '7:30 AM', activity: 'Breakfast', iconName: 'Coffee' },
+  { time: '8:00 AM', activity: 'Take medicine', iconName: 'Pill' },
+  { time: '9:00 AM', activity: 'Exercise', iconName: 'Dumbbell' },
+  { time: '12:00 PM', activity: 'Lunch', iconName: 'Utensils' },
+  { time: '2:00 PM', activity: 'Activities', iconName: 'Briefcase' },
+  { time: '6:00 PM', activity: 'Dinner', iconName: 'Utensils' },
+  { time: '7:00 PM', activity: 'Reading', iconName: 'Book' },
+  { time: '9:00 PM', activity: 'Evening routine', iconName: 'Bath' },
+  { time: '10:00 PM', activity: 'Sleep', iconName: 'Moon' },
+];
+
+export default function Schedule() {
+  const [currentActivity, setCurrentActivity] = useState(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [formData, setFormData] = useState({ time: '', activity: '', icon_name: 'Briefcase' });
+  
+  const queryClient = useQueryClient();
+
+  const { data: user } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
+  });
+
+  const { data: scheduleItems = [], isLoading } = useQuery({
+    queryKey: ['scheduleItems', user?.id],
+    queryFn: async () => {
+      const items = await base44.entities.ScheduleItem.filter({ user_id: user.id, enabled: true });
+      if (items.length === 0) {
+        // Initialize with default schedule
+        const defaultItems = defaultSchedule.map(item => ({
+          ...item,
+          user_id: user.id,
+          completed: false,
+          enabled: true,
+        }));
+        await base44.entities.ScheduleItem.bulkCreate(defaultItems);
+        return defaultItems;
+      }
+      return items;
+    },
+    enabled: !!user?.id,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data) => base44.entities.ScheduleItem.create({ ...data, user_id: user.id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['scheduleItems']);
+      setIsDialogOpen(false);
+      resetForm();
+      toast.success('Activity added');
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.ScheduleItem.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['scheduleItems']);
+      toast.success('Activity updated');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.ScheduleItem.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['scheduleItems']);
+      toast.success('Activity removed');
+    },
+  });
+
+  const resetForm = () => {
+    setFormData({ time: '', activity: '', icon_name: 'Briefcase' });
+    setEditingItem(null);
+  };
+
+  useEffect(() => {
+    if (!scheduleItems.length) return;
+    
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const currentTimeInMinutes = currentHour * 60 + currentMinutes;
+
+    const parseTime = (timeStr) => {
+      const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (!match) return 0;
+      let hours = parseInt(match[1]);
+      const minutes = parseInt(match[2]);
+      const period = match[3].toUpperCase();
+      if (period === 'PM' && hours !== 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+      return hours * 60 + minutes;
+    };
+
+    let nextActivityIndex = 0;
+    for (let i = 0; i < scheduleItems.length; i++) {
+      const activityTime = parseTime(scheduleItems[i].time);
+      if (currentTimeInMinutes >= activityTime) {
+        nextActivityIndex = i;
+      }
+    }
+    
+    setCurrentActivity(nextActivityIndex);
+  }, [scheduleItems]);
+
+  const toggleComplete = (item) => {
+    updateMutation.mutate({
+      id: item.id,
+      data: {
+        completed: !item.completed,
+        completed_at: !item.completed ? new Date().toISOString() : null,
+      },
+    });
+  };
+
+  const handleEdit = (item) => {
+    setEditingItem(item);
+    setFormData({
+      time: item.time,
+      activity: item.activity,
+      icon_name: item.icon_name || 'Briefcase',
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (editingItem) {
+      updateMutation.mutate({ id: editingItem.id, data: formData });
+      setIsDialogOpen(false);
+      resetForm();
+    } else {
+      createMutation.mutate(formData);
+    }
+  };
+
+  const handleDelete = (id) => {
+    if (confirm('Remove this activity?')) {
+      deleteMutation.mutate(id);
+    }
+  };
+
+  const completedCount = scheduleItems.filter(item => item.completed).length;
+  const progressPercent = scheduleItems.length > 0 ? Math.round((completedCount / scheduleItems.length) * 100) : 0;
+
+  const readSchedule = () => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      if (navigator.vibrate) {
+        navigator.vibrate([100]);
+      }
+      return;
+    }
+
+    let text = `Your schedule for today. You have ${scheduleItems.length} activities. `;
+    text += `${completedCount} completed, ${scheduleItems.length - completedCount} remaining. `;
+    
+    if (currentActivity !== null && !scheduleItems[currentActivity]?.completed) {
+      text += `Your next activity is: ${scheduleItems[currentActivity].activity} at ${scheduleItems[currentActivity].time}. `;
+    }
+    
+    text += `Here is your full schedule: `;
+    
+    scheduleItems.forEach((item, index) => {
+      const status = item.completed ? 'completed' : 
+                     index === currentActivity ? 'next' : 'upcoming';
+      text += `${item.time}, ${item.activity}, ${status}. `;
+    });
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+      if (navigator.vibrate) {
+        navigator.vibrate([100, 50, 100]);
+      }
+    };
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+    };
+
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  return (
+    <div className="min-h-screen p-6 pb-32">
+      {/* Header */}
+      <motion.header
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center py-6 mb-6"
+      >
+        <div className="flex items-center justify-center gap-3 mb-2">
+          <Calendar className="w-10 h-10 text-yellow-400" strokeWidth={2.5} />
+          <h1 className="text-4xl font-bold text-white">My Day</h1>
+        </div>
+        
+        {/* Progress indicator */}
+        <div className="mt-6 bg-gray-900 rounded-2xl p-4 border-2 border-gray-700">
+          <div className="flex justify-between items-center mb-3">
+            <span className="text-xl text-gray-400 font-bold">Progress</span>
+            <span className="text-2xl text-yellow-400 font-bold">{progressPercent}%</span>
+          </div>
+          <div className="h-4 bg-gray-800 rounded-full overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPercent}%` }}
+              className="h-full bg-yellow-400 rounded-full"
+            />
+          </div>
+          <p className="text-gray-500 mt-2 text-lg">
+            {completedCount} of {scheduleItems.length} activities completed
+          </p>
+          </div>
+
+          {/* Add Activity Button */}
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) resetForm();
+          }}>
+          <DialogTrigger asChild>
+            <AccessibleButton
+              variant="secondary"
+              size="large"
+              icon={Plus}
+              className="w-full"
+              hapticPattern="double"
+            >
+              ADD ACTIVITY
+            </AccessibleButton>
+          </DialogTrigger>
+
+          <DialogContent className="bg-gray-900 text-white border-gray-700">
+            <DialogHeader>
+              <DialogTitle className="text-2xl">
+                {editingItem ? 'Edit Activity' : 'Add Activity'}
+              </DialogTitle>
+            </DialogHeader>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="text-lg font-bold mb-2 block">Time *</label>
+                <Input
+                  value={formData.time}
+                  onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                  placeholder="e.g., 7:00 AM"
+                  required
+                  className="h-14 text-xl bg-gray-800 border-gray-600 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-lg font-bold mb-2 block">Activity *</label>
+                <Input
+                  value={formData.activity}
+                  onChange={(e) => setFormData({ ...formData, activity: e.target.value })}
+                  placeholder="e.g., Morning walk"
+                  required
+                  className="h-14 text-xl bg-gray-800 border-gray-600 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-lg font-bold mb-2 block">Icon</label>
+                <Select value={formData.icon_name} onValueChange={(value) => setFormData({ ...formData, icon_name: value })}>
+                  <SelectTrigger className="h-14 text-xl bg-gray-800 border-gray-600 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Sun">Sun</SelectItem>
+                    <SelectItem value="Coffee">Coffee</SelectItem>
+                    <SelectItem value="Pill">Pill</SelectItem>
+                    <SelectItem value="Dumbbell">Exercise</SelectItem>
+                    <SelectItem value="Utensils">Meal</SelectItem>
+                    <SelectItem value="Briefcase">Work</SelectItem>
+                    <SelectItem value="Book">Book</SelectItem>
+                    <SelectItem value="Bath">Bath</SelectItem>
+                    <SelectItem value="Moon">Moon</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <AccessibleButton
+                variant="primary"
+                size="large"
+                className="w-full"
+              >
+                {editingItem ? 'UPDATE' : 'ADD'} ACTIVITY
+              </AccessibleButton>
+            </form>
+          </DialogContent>
+          </Dialog>
+
+        {/* Read Schedule Button */}
+        <div className="mt-6">
+          <AccessibleButton
+            variant={isSpeaking ? 'danger' : 'success'}
+            size="large"
+            icon={isSpeaking ? VolumeX : Volume2}
+            onClick={readSchedule}
+            className="w-full"
+            hapticPattern="double"
+          >
+            {isSpeaking ? 'STOP READING' : 'READ MY DAY'}
+          </AccessibleButton>
+        </div>
+      </motion.header>
+
+      {/* Current activity braille display */}
+      {currentActivity !== null && scheduleItems[currentActivity] && !scheduleItems[currentActivity]?.completed && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <BrailleDisplay 
+            text={`Now: ${scheduleItems[currentActivity]?.activity}`} 
+          />
+        </motion.div>
+      )}
+
+      {/* Schedule list */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.1 }}
+        className="space-y-3"
+      >
+        {isLoading && (
+          <p className="text-center text-gray-400 text-xl">Loading schedule...</p>
+        )}
+        
+        {scheduleItems.map((item, index) => (
+          <motion.div
+            key={item.id}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: index * 0.05 }}
+            className="relative group"
+          >
+            <ScheduleItem
+              time={item.time}
+              activity={item.activity}
+              icon={iconMap[item.icon_name]}
+              isCompleted={item.completed}
+              isNext={index === currentActivity && !item.completed}
+              onToggle={() => toggleComplete(item)}
+            />
+            
+            <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={() => handleEdit(item)}
+                className="bg-yellow-400 text-black p-2 rounded-lg"
+              >
+                <Edit2 className="w-5 h-5" />
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </motion.div>
+    </div>
+  );
+}

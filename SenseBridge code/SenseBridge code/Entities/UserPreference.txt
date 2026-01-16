@@ -1,0 +1,48 @@
+{
+  "name": "UserPreference",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Reference to user"
+    },
+    "haptic_feedback": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable haptic vibration feedback"
+    },
+    "high_contrast": {
+      "type": "boolean",
+      "default": true,
+      "description": "High contrast mode"
+    },
+    "text_size": {
+      "type": "number",
+      "default": 100,
+      "description": "Text size percentage"
+    },
+    "preferred_language": {
+      "type": "string",
+      "default": "en",
+      "description": "Preferred language code"
+    },
+    "speech_rate": {
+      "type": "number",
+      "default": 0.9,
+      "description": "Text-to-speech rate"
+    },
+    "speech_pitch": {
+      "type": "number",
+      "default": 1.0,
+      "description": "Text-to-speech pitch"
+    },
+    "speech_volume": {
+      "type": "number",
+      "default": 1.0,
+      "description": "Text-to-speech volume"
+    }
+  },
+  "required": [
+    "user_id"
+  ]
+}

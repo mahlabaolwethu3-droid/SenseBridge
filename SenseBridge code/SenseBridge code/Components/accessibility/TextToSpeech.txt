@@ -1,0 +1,202 @@
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Volume2, VolumeX, Trash2, Play, Pause } from 'lucide-react';
+import AccessibleButton from './AccessibleButton';
+import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
+import { toast } from 'sonner';
+
+export default function TextToSpeech() {
+  const [text, setText] = useState('');
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [rate, setRate] = useState(1.0);
+  const [pitch, setPitch] = useState(1.0);
+  const [volume, setVolume] = useState(1.0);
+
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) {
+      toast.error('Text-to-speech not supported in this browser');
+    }
+
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  const speak = () => {
+    if (!text.trim()) {
+      toast.error('Please enter some text');
+      return;
+    }
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      if (navigator.vibrate) {
+        navigator.vibrate([100]);
+      }
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = rate;
+    utterance.pitch = pitch;
+    utterance.volume = volume;
+
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+      if (navigator.vibrate) {
+        navigator.vibrate([100, 50, 100]);
+      }
+    };
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      if (navigator.vibrate) {
+        navigator.vibrate([50]);
+      }
+    };
+
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      toast.error('Speech error occurred');
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const clearText = () => {
+    setText('');
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+    if (navigator.vibrate) {
+      navigator.vibrate([50]);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Speaking indicator */}
+      {isSpeaking && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-green-900/50 border-4 border-green-500 rounded-2xl p-6 text-center"
+        >
+          <motion.div
+            animate={{ scale: [1, 1.1, 1] }}
+            transition={{ repeat: Infinity, duration: 0.8 }}
+            className="inline-block"
+          >
+            <Volume2 className="w-16 h-16 text-green-400 mx-auto mb-3" strokeWidth={2.5} />
+          </motion.div>
+          <p className="text-3xl font-bold text-white">SPEAKING...</p>
+        </motion.div>
+      )}
+
+      {/* Text input */}
+      <div className="bg-gray-900 border-4 border-gray-600 rounded-2xl p-6">
+        <label className="text-2xl font-bold text-white mb-4 block">
+          Enter Text to Speak
+        </label>
+        <Textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Type your message here..."
+          className="min-h-[200px] text-2xl bg-white text-black border-4 border-gray-300 rounded-xl p-4 focus:ring-4 focus:ring-cyan-400"
+        />
+      </div>
+
+      {/* Voice settings */}
+      <div className="bg-gray-900 border-4 border-gray-600 rounded-2xl p-6 space-y-6">
+        <h3 className="text-2xl font-bold text-white mb-4">Voice Settings</h3>
+        
+        {/* Speed */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <label className="text-xl text-white font-bold">Speed</label>
+            <span className="text-xl text-yellow-400 font-bold">{rate.toFixed(1)}x</span>
+          </div>
+          <Slider
+            value={[rate]}
+            onValueChange={([value]) => setRate(value)}
+            min={0.5}
+            max={2.0}
+            step={0.1}
+            className="w-full"
+          />
+          <div className="flex justify-between text-gray-500 text-sm">
+            <span>Slower</span>
+            <span>Faster</span>
+          </div>
+        </div>
+
+        {/* Pitch */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <label className="text-xl text-white font-bold">Pitch</label>
+            <span className="text-xl text-yellow-400 font-bold">{pitch.toFixed(1)}</span>
+          </div>
+          <Slider
+            value={[pitch]}
+            onValueChange={([value]) => setPitch(value)}
+            min={0.5}
+            max={2.0}
+            step={0.1}
+            className="w-full"
+          />
+          <div className="flex justify-between text-gray-500 text-sm">
+            <span>Lower</span>
+            <span>Higher</span>
+          </div>
+        </div>
+
+        {/* Volume */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <label className="text-xl text-white font-bold">Volume</label>
+            <span className="text-xl text-yellow-400 font-bold">{Math.round(volume * 100)}%</span>
+          </div>
+          <Slider
+            value={[volume]}
+            onValueChange={([value]) => setVolume(value)}
+            min={0.1}
+            max={1.0}
+            step={0.1}
+            className="w-full"
+          />
+          <div className="flex justify-between text-gray-500 text-sm">
+            <span>Quiet</span>
+            <span>Loud</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div className="grid grid-cols-2 gap-4">
+        <AccessibleButton
+          variant={isSpeaking ? 'danger' : 'success'}
+          size="xlarge"
+          icon={isSpeaking ? Pause : Play}
+          onClick={speak}
+          hapticPattern={isSpeaking ? 'single' : 'double'}
+          className="col-span-2"
+        >
+          {isSpeaking ? 'STOP' : 'SPEAK'}
+        </AccessibleButton>
+
+        {text && (
+          <AccessibleButton
+            variant="secondary"
+            size="large"
+            icon={Trash2}
+            onClick={clearText}
+            className="col-span-2"
+          >
+            Clear Text
+          </AccessibleButton>
+        )}
+      </div>
+    </div>
+  );
+}

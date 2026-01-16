@@ -1,0 +1,290 @@
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { 
+  Settings as SettingsIcon, Vibrate, Sun, Moon, 
+  Volume2, Type, RotateCcw, Check, Eye, Ear, User, Activity
+} from 'lucide-react';
+import AccessibleButton from '@/components/accessibility/AccessibleButton';
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { HapticPatterns, vibrate } from '@/components/accessibility/HapticFeedback';
+
+export default function Settings() {
+  const [saved, setSaved] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: user } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
+  });
+
+  const { data: preferences, isLoading } = useQuery({
+    queryKey: ['userPreferences', user?.id],
+    queryFn: async () => {
+      const prefs = await base44.entities.UserPreference.filter({ user_id: user.id });
+      if (prefs.length === 0) {
+        const newPref = await base44.entities.UserPreference.create({ user_id: user.id });
+        return newPref;
+      }
+      return prefs[0];
+    },
+    enabled: !!user?.id,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data) => base44.entities.UserPreference.update(preferences.id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['userPreferences']);
+      toast.success('Settings saved');
+      vibrate('success');
+    },
+  });
+
+  useEffect(() => {
+    if (preferences?.text_size) {
+      document.documentElement.style.fontSize = `${preferences.text_size}%`;
+    }
+  }, [preferences?.text_size]);
+
+  const updateSetting = (key, value) => {
+    if (!preferences) return;
+    updateMutation.mutate({ [key]: value });
+    if (preferences.haptic_feedback) {
+      vibrate('tap');
+    }
+  };
+
+  const testVibrationPattern = (pattern) => {
+    vibrate(pattern);
+  };
+
+  const SettingRow = ({ icon: Icon, title, description, children }) => (
+    <div className="bg-black border-4 border-white rounded-2xl p-5 shadow-lg">
+      <div className="flex items-start gap-4">
+        <div className="w-14 h-14 rounded-xl bg-blue-600 border-2 border-white flex items-center justify-center flex-shrink-0">
+          <Icon className="w-8 h-8 text-white" strokeWidth={3} />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-xl font-black text-white mb-1">{title}</h3>
+          <p className="text-white text-lg mb-3 font-bold">{description}</p>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (isLoading || !preferences) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-white text-2xl">Loading settings...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-6 pb-32">
+      {/* Header */}
+      <motion.header
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center py-6 mb-6"
+      >
+        <div className="flex items-center justify-center gap-3 mb-2">
+          <SettingsIcon className="w-10 h-10 text-white" strokeWidth={3} />
+          <h1 className="text-4xl font-black text-white">Settings</h1>
+        </div>
+        <p className="text-xl text-white font-bold">Customize your experience</p>
+      </motion.header>
+
+      {/* Settings list */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="space-y-4"
+      >
+        {/* My Needs Profile */}
+        <SettingRow
+          icon={User}
+          title="My Needs"
+          description="Tell us about your accessibility needs"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="text-white font-bold mb-2 block">Preferred Language</label>
+              <Select 
+                value={preferences.preferred_language} 
+                onValueChange={(value) => updateSetting('preferred_language', value)}
+              >
+                <SelectTrigger className="h-14 text-xl bg-gray-900 border-2 border-white text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="af">Afrikaans</SelectItem>
+                  <SelectItem value="zu">Zulu</SelectItem>
+                  <SelectItem value="xh">Xhosa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </SettingRow>
+
+        {/* Haptic Feedback */}
+        <SettingRow
+          icon={Vibrate}
+          title="Haptic Feedback"
+          description="Vibration patterns for touch feedback"
+        >
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-white font-bold">Enable Haptics</span>
+              <Switch
+                checked={preferences.haptic_feedback}
+                onCheckedChange={(checked) => updateSetting('haptic_feedback', checked)}
+                className="data-[state=checked]:bg-blue-600 h-8 w-14"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => testVibrationPattern('notification')}
+                className="px-3 py-2 bg-blue-600 text-white rounded-xl font-bold border-2 border-white"
+              >
+                Notification
+              </button>
+              <button
+                onClick={() => testVibrationPattern('message')}
+                className="px-3 py-2 bg-blue-600 text-white rounded-xl font-bold border-2 border-white"
+              >
+                Message
+              </button>
+              <button
+                onClick={() => testVibrationPattern('reminder')}
+                className="px-3 py-2 bg-blue-600 text-white rounded-xl font-bold border-2 border-white"
+              >
+                Reminder
+              </button>
+              <button
+                onClick={() => testVibrationPattern('emergency')}
+                className="px-3 py-2 bg-white text-black rounded-xl font-black border-2 border-black"
+              >
+                Emergency
+              </button>
+            </div>
+          </div>
+        </SettingRow>
+
+        {/* High Contrast */}
+        <SettingRow
+          icon={Sun}
+          title="High Contrast Mode"
+          description="Maximum visual contrast (always on)"
+        >
+          <div className="bg-blue-600 text-white px-4 py-3 rounded-xl font-bold border-2 border-white">
+            ✓ High Contrast Always Enabled
+          </div>
+        </SettingRow>
+
+        {/* Text Size */}
+        <SettingRow
+          icon={Type}
+          title="Text Size"
+          description="Adjust text size for readability"
+        >
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-3xl text-white font-black">{preferences.text_size}%</span>
+            </div>
+            <Slider
+              value={[preferences.text_size]}
+              onValueChange={([value]) => updateSetting('text_size', value)}
+              min={80}
+              max={200}
+              step={10}
+              className="w-full"
+            />
+            <div className="flex justify-between text-white font-bold">
+              <span>Small</span>
+              <span>Large</span>
+            </div>
+          </div>
+        </SettingRow>
+
+        {/* Speech Settings */}
+        <SettingRow
+          icon={Volume2}
+          title="Speech Settings"
+          description="Customize voice output"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="text-white font-bold mb-2 block">Speech Rate</label>
+              <Slider
+                value={[preferences.speech_rate * 100]}
+                onValueChange={([value]) => updateSetting('speech_rate', value / 100)}
+                min={50}
+                max={150}
+                step={10}
+                className="w-full"
+              />
+              <div className="flex justify-between text-white text-sm mt-1">
+                <span>Slow</span>
+                <span>{Math.round(preferences.speech_rate * 100)}%</span>
+                <span>Fast</span>
+              </div>
+            </div>
+            
+            <div>
+              <label className="text-white font-bold mb-2 block">Speech Volume</label>
+              <Slider
+                value={[preferences.speech_volume * 100]}
+                onValueChange={([value]) => updateSetting('speech_volume', value / 100)}
+                min={0}
+                max={100}
+                step={10}
+                className="w-full"
+              />
+              <div className="flex justify-between text-white text-sm mt-1">
+                <span>Quiet</span>
+                <span>{Math.round(preferences.speech_volume * 100)}%</span>
+                <span>Loud</span>
+              </div>
+            </div>
+          </div>
+        </SettingRow>
+
+        {/* Activity Logging */}
+        <SettingRow
+          icon={Activity}
+          title="Activity Monitoring"
+          description="Track app usage and performance"
+        >
+          <div className="bg-blue-600 text-white px-4 py-3 rounded-xl font-bold border-2 border-white">
+            ✓ Monitoring Active
+          </div>
+          <p className="text-white text-sm mt-2 font-bold">
+            Logs emergency alerts, AI usage, and errors for safety
+          </p>
+        </SettingRow>
+      </motion.div>
+
+      {/* App info */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className="mt-8 text-center"
+      >
+        <div className="bg-black rounded-2xl p-6 border-4 border-white">
+          <p className="text-white text-lg font-black">Accessibility App</p>
+          <p className="text-white mt-1 font-bold">Designed for deafblind & colorblind users</p>
+          <p className="text-white text-sm mt-2">High contrast • Haptic feedback • AI assistance</p>
+        </div>
+      </motion.div>
+    </div>
+  );
+}

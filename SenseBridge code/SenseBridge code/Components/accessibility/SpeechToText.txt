@@ -1,0 +1,187 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Mic, MicOff, Trash2, Copy } from 'lucide-react';
+import AccessibleButton from './AccessibleButton';
+import BrailleDisplay from './BrailleDisplay';
+import { toast } from 'sonner';
+
+export default function SpeechToText() {
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast.error('Speech recognition not supported in this browser');
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+      let interim = '';
+      let final = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          final += transcript + ' ';
+        } else {
+          interim += transcript;
+        }
+      }
+
+      if (final) {
+        setTranscript(prev => prev + final);
+        setInterimTranscript('');
+      } else {
+        setInterimTranscript(interim);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      if (isListening) {
+        recognition.start();
+      }
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [isListening]);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      if (navigator.vibrate) {
+        navigator.vibrate([100]);
+      }
+    } else {
+      recognitionRef.current?.start();
+      setIsListening(true);
+      if (navigator.vibrate) {
+        navigator.vibrate([100, 50, 100]);
+      }
+    }
+  };
+
+  const clearTranscript = () => {
+    setTranscript('');
+    setInterimTranscript('');
+    if (navigator.vibrate) {
+      navigator.vibrate([50]);
+    }
+  };
+
+  const copyTranscript = () => {
+    navigator.clipboard.writeText(transcript);
+    toast.success('Text copied!');
+    if (navigator.vibrate) {
+      navigator.vibrate([50, 30, 50]);
+    }
+  };
+
+  const displayText = transcript + (interimTranscript ? ' ' + interimTranscript : '');
+
+  return (
+    <div className="space-y-6">
+      {/* Listening indicator */}
+      <AnimatePresence>
+        {isListening && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-red-900/50 border-4 border-red-500 rounded-2xl p-6 text-center"
+          >
+            <motion.div
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ repeat: Infinity, duration: 1 }}
+              className="inline-block"
+            >
+              <Mic className="w-16 h-16 text-red-400 mx-auto mb-3" strokeWidth={2.5} />
+            </motion.div>
+            <p className="text-3xl font-bold text-white">LISTENING...</p>
+            <p className="text-xl text-red-400 mt-2">Speak clearly into microphone</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Transcript display */}
+      {displayText && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white border-4 border-gray-300 rounded-2xl p-6 min-h-[200px]"
+        >
+          <p className="text-3xl text-black leading-relaxed whitespace-pre-wrap">
+            {transcript}
+            {interimTranscript && (
+              <span className="text-gray-500 italic">{interimTranscript}</span>
+            )}
+          </p>
+        </motion.div>
+      )}
+
+      {/* Braille display */}
+      {displayText && <BrailleDisplay text={displayText} showOriginal={false} />}
+
+      {/* Controls */}
+      <div className="grid grid-cols-2 gap-4">
+        <AccessibleButton
+          variant={isListening ? 'danger' : 'primary'}
+          size="xlarge"
+          icon={isListening ? MicOff : Mic}
+          onClick={toggleListening}
+          hapticPattern={isListening ? 'single' : 'double'}
+          className="col-span-2"
+        >
+          {isListening ? 'STOP' : 'START LISTENING'}
+        </AccessibleButton>
+
+        {transcript && (
+          <>
+            <AccessibleButton
+              variant="secondary"
+              size="large"
+              icon={Copy}
+              onClick={copyTranscript}
+            >
+              Copy
+            </AccessibleButton>
+            <AccessibleButton
+              variant="danger"
+              size="large"
+              icon={Trash2}
+              onClick={clearTranscript}
+            >
+              Clear
+            </AccessibleButton>
+          </>
+        )}
+      </div>
+
+      {!displayText && !isListening && (
+        <div className="text-center py-8 text-gray-500">
+          <p className="text-2xl">Tap START to begin listening</p>
+        </div>
+      )}
+    </div>
+  );
+}

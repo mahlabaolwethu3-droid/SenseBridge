@@ -1,0 +1,45 @@
+{
+  "name": "ActivityLog",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Reference to user"
+    },
+    "activity_type": {
+      "type": "string",
+      "enum": [
+        "communication",
+        "vision_assist",
+        "speech_to_text",
+        "text_to_speech",
+        "emergency",
+        "schedule",
+        "settings"
+      ],
+      "description": "Type of activity performed"
+    },
+    "description": {
+      "type": "string",
+      "description": "Activity description"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Additional activity data"
+    },
+    "success": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether activity completed successfully"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Error message if failed"
+    }
+  },
+  "required": [
+    "user_id",
+    "activity_type"
+  ]
+}

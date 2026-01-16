@@ -1,0 +1,50 @@
+// Haptic Language System - Different vibration patterns for different meanings
+
+export const HapticPatterns = {
+  // Basic patterns
+  tap: [50],
+  doubleTap: [50, 50, 50],
+  tripleTap: [50, 50, 50, 50, 50],
+  
+  // Notifications
+  notification: [100],
+  message: [200],
+  reminder: [100, 100, 100, 100, 100],
+  
+  // Status patterns
+  success: [50, 30, 50, 30, 100],
+  error: [200, 100, 200],
+  warning: [100, 50, 100, 50, 100],
+  
+  // Emergency patterns
+  emergency: [200, 100, 200, 100, 200, 100, 200],
+  urgent: [150, 50, 150, 50, 150],
+  
+  // Activity patterns
+  activity_start: [50, 100, 50],
+  activity_complete: [50, 30, 50, 30, 200],
+  
+  // Navigation patterns
+  page_change: [30],
+  button_press: [50],
+  swipe: [30, 20, 30],
+};
+
+export const vibrate = (pattern) => {
+  if (navigator.vibrate) {
+    const vibrationPattern = HapticPatterns[pattern] || HapticPatterns.tap;
+    navigator.vibrate(vibrationPattern);
+  }
+};
+
+export const vibrateCustom = (pattern) => {
+  if (navigator.vibrate && Array.isArray(pattern)) {
+    navigator.vibrate(pattern);
+  }
+};
+
+export default {
+  patterns: HapticPatterns,
+  vibrate,
+  vibrateCustom,
+};

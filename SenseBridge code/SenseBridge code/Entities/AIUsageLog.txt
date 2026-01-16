@@ -1,0 +1,53 @@
+{
+  "name": "AIUsageLog",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Reference to user"
+    },
+    "feature": {
+      "type": "string",
+      "enum": [
+        "vision_assist",
+        "translation",
+        "speech_to_text",
+        "text_to_speech"
+      ],
+      "description": "AI feature used"
+    },
+    "prompt_tokens": {
+      "type": "number",
+      "description": "Input tokens used"
+    },
+    "completion_tokens": {
+      "type": "number",
+      "description": "Output tokens used"
+    },
+    "total_tokens": {
+      "type": "number",
+      "description": "Total tokens used"
+    },
+    "response_time_ms": {
+      "type": "number",
+      "description": "Response time in milliseconds"
+    },
+    "success": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether request succeeded"
+    },
+    "error_type": {
+      "type": "string",
+      "description": "Error type if failed"
+    },
+    "cost_estimate": {
+      "type": "number",
+      "description": "Estimated cost in USD"
+    }
+  },
+  "required": [
+    "user_id",
+    "feature"
+  ]
+}

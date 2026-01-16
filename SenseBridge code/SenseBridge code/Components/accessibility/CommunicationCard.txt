@@ -1,0 +1,45 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+import { cn } from "@/lib/utils";
+
+export default function CommunicationCard({ 
+  message, 
+  icon: Icon, 
+  color = 'yellow',
+  onSelect 
+}) {
+  const colors = {
+    yellow: 'bg-yellow-400 border-yellow-200 text-black',
+    cyan: 'bg-cyan-400 border-cyan-200 text-black',
+    green: 'bg-green-400 border-green-200 text-black',
+    orange: 'bg-orange-400 border-orange-200 text-black',
+    purple: 'bg-purple-400 border-purple-200 text-black',
+    pink: 'bg-pink-400 border-pink-200 text-black',
+  };
+
+  const handleSelect = () => {
+    if (navigator.vibrate) {
+      navigator.vibrate([50, 30, 50]);
+    }
+    onSelect?.(message);
+  };
+
+  return (
+    <motion.button
+      whileTap={{ scale: 0.95 }}
+      whileHover={{ scale: 1.02 }}
+      onClick={handleSelect}
+      className={cn(
+        'w-full min-h-[100px] rounded-2xl border-4 p-6',
+        'flex flex-col items-center justify-center gap-3',
+        'font-bold text-xl text-center',
+        'focus:outline-none focus:ring-4 focus:ring-white focus:ring-offset-4 focus:ring-offset-black',
+        'transition-all duration-200 shadow-lg',
+        colors[color]
+      )}
+    >
+      {Icon && <Icon className="w-12 h-12" strokeWidth={3} />}
+      <span>{message}</span>
+    </motion.button>
+  );
+}

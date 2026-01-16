@@ -1,0 +1,48 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+
+// Simple Braille mapping for letters and common characters
+const brailleMap = {
+  'a': '⠁', 'b': '⠃', 'c': '⠉', 'd': '⠙', 'e': '⠑',
+  'f': '⠋', 'g': '⠛', 'h': '⠓', 'i': '⠊', 'j': '⠚',
+  'k': '⠅', 'l': '⠇', 'm': '⠍', 'n': '⠝', 'o': '⠕',
+  'p': '⠏', 'q': '⠟', 'r': '⠗', 's': '⠎', 't': '⠞',
+  'u': '⠥', 'v': '⠧', 'w': '⠺', 'x': '⠭', 'y': '⠽',
+  'z': '⠵', ' ': '⠀', '.': '⠲', ',': '⠂', '!': '⠖',
+  '?': '⠦', "'": '⠄', '-': '⠤', '0': '⠚', '1': '⠁',
+  '2': '⠃', '3': '⠉', '4': '⠙', '5': '⠑', '6': '⠋',
+  '7': '⠛', '8': '⠓', '9': '⠊',
+};
+
+export default function BrailleDisplay({ text = '', showOriginal = true }) {
+  const toBraille = (str) => {
+    return str.toLowerCase().split('').map(char => brailleMap[char] || char).join('');
+  };
+
+  const brailleText = toBraille(text);
+
+  return (
+    <div className="bg-black border-4 border-white rounded-2xl p-6 space-y-4 shadow-lg">
+      {showOriginal && text && (
+        <div className="text-white text-xl font-bold pb-4 border-b-4 border-white">
+          {text}
+        </div>
+      )}
+      
+      <motion.div
+        key={brailleText}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="min-h-[60px] flex items-center"
+      >
+        <p className="text-yellow-300 text-4xl font-mono tracking-wider break-all leading-relaxed font-bold">
+          {brailleText || '⠀⠀⠀'}
+        </p>
+      </motion.div>
+      
+      <div className="text-white text-sm pt-2 border-t-4 border-white font-bold">
+        Braille representation
+      </div>
+    </div>
+  );
+}

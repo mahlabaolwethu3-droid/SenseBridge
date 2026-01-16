@@ -1,0 +1,253 @@
+import React, { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Camera, Image, Loader2, Eye, Volume2, Trash2 } from 'lucide-react';
+import AccessibleButton from './AccessibleButton';
+import BrailleDisplay from './BrailleDisplay';
+import { base44 } from '@/api/base44Client';
+import { toast } from 'sonner';
+
+export default function VisionAssist() {
+  const [description, setDescription] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleFileSelect = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    if (navigator.vibrate) {
+      navigator.vibrate([50, 30, 50]);
+    }
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target.result);
+    };
+    reader.readAsDataURL(file);
+
+    // Analyze image
+    await analyzeImage(file);
+  };
+
+  const analyzeImage = async (file) => {
+    setIsAnalyzing(true);
+    setDescription('');
+
+    try {
+      // Upload file first
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+
+      // Use LLM with vision to describe the image
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `You are Vision Assist, an accessibility-focused vision AI. Your role is to analyze images provided by the user and describe them in a clear, simple, and useful way for users who may be blind or have low vision.
+
+Follow these rules strictly:
+
+• Describe only what is visible in the image. Do not guess or assume.
+• Use short, clear sentences with simple vocabulary.
+• Focus on important objects, people, actions, and potential safety information.
+• Avoid unnecessary detail, artistic language, or technical terms.
+• If people are present, describe position and activity without identifying who they are.
+• If text appears in the image, read it exactly as shown.
+• If the image quality is unclear, say so honestly.
+• Do not mention AI limitations or disclaimers unless the image cannot be analyzed.
+• Do not identify real people or speculate about personal attributes.
+• Keep the response suitable for conversion to speech, Braille, and haptic alerts.
+
+Your goal is to help the user understand their surroundings clearly and safely.
+
+Analyze the image and describe what you see.`,
+        file_urls: [file_url],
+      });
+
+      // Remove any "I cannot see" disclaimers from the response
+      const cleanedResponse = response
+        .replace(/I('m| am) unable to (view|see|analyze) (images?|photos?|pictures?).*?\./gi, '')
+        .replace(/I (don't|do not|cannot|can't) have the ability to (view|see|analyze).*?\./gi, '')
+        .replace(/As an AI language model.*?\./gi, '')
+        .trim();
+      
+      setDescription(cleanedResponse);
+      
+      if (navigator.vibrate) {
+        navigator.vibrate([100, 50, 100, 50, 100]);
+      }
+
+      toast.success('Image analyzed successfully');
+
+      // Auto-speak the description
+      setTimeout(() => speakDescription(cleanedResponse), 500);
+    } catch (error) {
+      console.error('Error analyzing image:', error);
+      toast.error('Failed to analyze image');
+      if (navigator.vibrate) {
+        navigator.vibrate([200, 100, 200]);
+      }
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const speakDescription = (text) => {
+    if (!text) text = description;
+    if (!text.trim()) return;
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+      if (navigator.vibrate) {
+        navigator.vibrate([50, 30, 50]);
+      }
+    };
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const clearAll = () => {
+    setDescription('');
+    setImagePreview(null);
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    if (navigator.vibrate) {
+      navigator.vibrate([50]);
+    }
+  };
+
+  const openCamera = () => {
+    fileInputRef.current?.click();
+  };
+
+  return (
+    <div className="space-y-6">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      {/* Analyzing indicator */}
+      <AnimatePresence>
+        {isAnalyzing && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-cyan-900/50 border-4 border-cyan-500 rounded-2xl p-6 text-center"
+          >
+            <Loader2 className="w-16 h-16 text-cyan-400 mx-auto mb-3 animate-spin" strokeWidth={2.5} />
+            <p className="text-3xl font-bold text-white">ANALYZING...</p>
+            <p className="text-xl text-cyan-400 mt-2">Processing image</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Image preview */}
+      {imagePreview && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-gray-900 border-4 border-gray-600 rounded-2xl overflow-hidden"
+        >
+          <img
+            src={imagePreview}
+            alt="Captured"
+            className="w-full h-64 object-cover"
+          />
+        </motion.div>
+      )}
+
+      {/* Description */}
+      {description && (
+        <>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white border-4 border-gray-300 rounded-2xl p-6"
+          >
+            <div className="flex items-center gap-3 mb-4 pb-4 border-b-2 border-gray-300">
+              <Eye className="w-8 h-8 text-black" strokeWidth={2.5} />
+              <h3 className="text-2xl font-bold text-black">Scene Description</h3>
+            </div>
+            <p className="text-2xl text-black leading-relaxed whitespace-pre-wrap">
+              {description}
+            </p>
+          </motion.div>
+
+          <BrailleDisplay text={description} showOriginal={false} />
+
+          <AccessibleButton
+            variant={isSpeaking ? 'danger' : 'success'}
+            size="large"
+            icon={Volume2}
+            onClick={() => speakDescription()}
+            className="w-full"
+          >
+            {isSpeaking ? 'Stop Reading' : 'Read Aloud'}
+          </AccessibleButton>
+        </>
+      )}
+
+      {/* Camera button */}
+      <div className="grid grid-cols-1 gap-4">
+        <AccessibleButton
+          variant="primary"
+          size="xlarge"
+          icon={Camera}
+          onClick={openCamera}
+          disabled={isAnalyzing}
+          className="w-full"
+          hapticPattern="double"
+        >
+          TAKE PHOTO
+        </AccessibleButton>
+
+        {(imagePreview || description) && (
+          <AccessibleButton
+            variant="secondary"
+            size="large"
+            icon={Trash2}
+            onClick={clearAll}
+          >
+            Clear All
+          </AccessibleButton>
+        )}
+      </div>
+
+      {!imagePreview && !description && !isAnalyzing && (
+        <div className="text-center py-8 text-gray-500">
+          <Camera className="w-20 h-20 mx-auto mb-4 text-gray-600" />
+          <p className="text-2xl">Tap to take a photo</p>
+          <p className="text-xl mt-2">AI will describe what it sees</p>
+        </div>
+      )}
+    </div>
+  );
+}

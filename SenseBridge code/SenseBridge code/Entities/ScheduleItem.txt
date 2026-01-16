@@ -1,0 +1,47 @@
+{
+  "name": "ScheduleItem",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Reference to user"
+    },
+    "time": {
+      "type": "string",
+      "description": "Time of activity (e.g., 7:00 AM)"
+    },
+    "activity": {
+      "type": "string",
+      "description": "Activity name"
+    },
+    "icon_name": {
+      "type": "string",
+      "description": "Icon identifier"
+    },
+    "completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether activity is completed"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When activity was completed"
+    },
+    "recurring": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this repeats daily"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this activity is active"
+    }
+  },
+  "required": [
+    "user_id",
+    "time",
+    "activity"
+  ]
+}
